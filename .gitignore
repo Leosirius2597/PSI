@@ -1,0 +1,52 @@
+# 编译产物目录
+output/
+build/
+
+# 目标文件
+*.o
+
+# 可执行文件
+psi_program
+psi_program_debug
+modsystem_test
+
+# CMake 相关（output 目录下的会被整个目录忽略规则覆盖）
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# 根目录的 Makefile（保留原 makefile）
+/Makefile
+
+# compile_commands.json 保留在根目录供 clangd 使用
+# 如果不想提交到 git，取消下面的注释
+# /compile_commands.json
+
+# 调试信息
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.tmp
+*.bak
+*.log
+
+
+# 其他
+compile_commands.json
+
+.cache/
