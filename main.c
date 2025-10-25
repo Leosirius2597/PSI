@@ -6,13 +6,13 @@
 #include "Beaver_Cloud.h"
 
 // 定义数据集大小2^k
-#define DATASET_NUM 20
+#define DATASET_NUM 10
 
 // 定义桶数量
-#define BUCKET_NUM 21730
+#define BUCKET_NUM 21
 
 // 定义数据比特位数
-#define DATA_BIT 128
+#define DATA_BIT 40
 
 int main(){
 
@@ -40,9 +40,15 @@ int main(){
     // 初始化客户端
     for (size_t i = 0; i < client_count; ++i) {
         clients[i] = malloc(sizeof(Client));
-        client_init(&clients[i], DATASET_NUM, DATA_BIT, BUCKET_NUM, 123, i+1);
-        client_build_buckets(&clients[i]);
+        client_init(clients[i], DATASET_NUM, DATA_BIT, BUCKET_NUM, 123, i+1);
+        client_build_buckets(clients[i]);
+        client_insert_dataset(clients[i]);
     }
+
+    // 初始化验证方
+    verify_init(&verify, DATASET_NUM, DATA_BIT, BUCKET_NUM, 456);
+    verify_build_buckets(&verify);
+    verify_insert_dataset(&verify);
 
     // 初始化PSI云平台
     psi_cloud_init(&psi_cloud, client_count+1, BUCKET_NUM, DATA_BIT, 123);
@@ -70,7 +76,7 @@ int main(){
     verify_distribute_aes_key(&verify, clients, client_count);
 
     // 第七步，发送PSI结果到验证方
-    send_result_to_verify(&clients, client_count, &psi_cloud, &verify, &mods);
+    send_result_to_verify(clients, client_count, &psi_cloud, &verify, &mods);
 
     // 最后一步，验证方合并结果并检查交集
     verify_merge_and_check_intersection(&verify, &mods);
@@ -84,15 +90,12 @@ int main(){
 
     // 释放 PSI云平台
     psi_cloud_free(&psi_cloud);
-    free(&psi_cloud);
 
     // 释放 Beaver云平台
     beaver_cloud_free(&beaver_cloud);
-    free(&beaver_cloud);
 
     // 释放验证方
     verify_free(&verify);
-    free(&verify);
 
     return 0;
 

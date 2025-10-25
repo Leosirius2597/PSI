@@ -156,7 +156,7 @@ void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
     mpz_t r_in;
     mpz_init_set(r_in, data);
 
-    printf("[Verify] 桶 %zu: 插入数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
+    // printf("[Verify] 桶 %zu: 插入数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
 
     // 使用降幂形式替换
     bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, r_out, r_in);
@@ -254,7 +254,7 @@ void verify_insert_dataset(Verify *verify) {
         verify_insert_data(verify, bucket_idx, s_tagged);
 
         // 打印进度
-        if ((i + 1) % 128 == 0)
+        if ((i + 1) % 10000 == 0)
             printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
     }
 

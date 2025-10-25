@@ -34,7 +34,7 @@ void psi_sync_all_clients(PSICloud *cloud, Client *clients[], size_t client_coun
     for (size_t i = 0; i < client_num; i++){
         if (clients[i]) {           
             // RSA 加密+解密 发送 AES 密钥
-            rsa_transfer_aes_key(&clients[i]->rsa_ctx, &clients[i]->aes_psi, &cloud->aes_internal);
+            rsa_transfer_aes_key(clients[i]->rsa_ctx, &clients[i]->aes_psi, &cloud->aes_internal);
             printf("[PSI] AES 会话密钥同步给 Client %d 成功。\n", i);
         }
     }
@@ -44,7 +44,7 @@ void psi_sync_all_clients(PSICloud *cloud, Client *clients[], size_t client_coun
     // =====================================================
     if (verify) {    
         // RSA 加密+解密 发送 AES 密钥
-        rsa_transfer_aes_key(&verify->rsa_ctx, &verify->aes_psi, &cloud->aes_internal);
+        rsa_transfer_aes_key(verify->rsa_ctx, &verify->aes_psi, &cloud->aes_internal);
         printf("[PSI] AES 会话密钥同步给 Verify 成功。\n");
     }
 
@@ -52,7 +52,7 @@ void psi_sync_all_clients(PSICloud *cloud, Client *clients[], size_t client_coun
     // 3️⃣ 分发给 BeaverCloud
     // =====================================================
     if (beaver) {
-        rsa_transfer_aes_key(&beaver->rsa_ctx, &beaver->aes_ctx, &cloud->aes_internal);
+        rsa_transfer_aes_key(beaver->rsa_ctx, &beaver->aes_ctx, &cloud->aes_internal);
         printf("[PSI] AES 会话密钥同步给 BeaverCloud 成功。\n");
 
     }
@@ -194,27 +194,25 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
 
     size_t k = cloud->original.beaver_A.count;
 
-    // 初始化云平台内部的用户Beaver三元组部分
-    for (size_t i = 0; i < client_count; i++){
-        bucket_init(&psi_cloud->users[clients[i]->user_id].H_Beaver_a, k, cloud->m_bit);
-        bucket_init(&psi_cloud->users[clients[i]->user_id].H_Beaver_b, k, cloud->m_bit);
-        result_bucket_init(&psi_cloud->users[clients[i]->user_id].H_Beaver_c, k);
-    }
-
-    // 初始化云平台中验证方的Beaver三元组部分
-    bucket_init(&psi_cloud->users[0].H_Beaver_a, k, cloud->m_bit);
-    bucket_init(&psi_cloud->users[0].H_Beaver_b, k, cloud->m_bit);
-    result_bucket_init(&psi_cloud->users[0].H_Beaver_c, k);
+    // 注意：PSI Cloud 的 Beaver 桶已在 psi_cloud_init 中初始化，无需重复初始化
 
     // --- 临时随机拆分 ---
-    Bucket A0, B0, A1, B1;
-    Result_Bucket C0, C1;
-    bucket_init((BucketSet*)&A0, 1, cloud->m_bit);
-    bucket_init((BucketSet*)&B0, 1, cloud->m_bit);
-    bucket_init((BucketSet*)&A1, 1, cloud->m_bit);
-    bucket_init((BucketSet*)&B1, 1, cloud->m_bit);
-    result_bucket_init((Result_BucketSet*)&C0, 1);
-    result_bucket_init((Result_BucketSet*)&C1, 1);
+    BucketSet A0_set, B0_set, A1_set, B1_set;
+    Result_BucketSet C0_set, C1_set;
+    bucket_init(&A0_set, 1, cloud->m_bit);
+    bucket_init(&B0_set, 1, cloud->m_bit);
+    bucket_init(&A1_set, 1, cloud->m_bit);
+    bucket_init(&B1_set, 1, cloud->m_bit);
+    result_bucket_init(&C0_set, 1);
+    result_bucket_init(&C1_set, 1);
+    
+    // 使用第一个桶作为临时存储
+    Bucket *A0 = &A0_set.buckets[0];
+    Bucket *B0 = &B0_set.buckets[0];
+    Bucket *A1 = &A1_set.buckets[0];
+    Bucket *B1 = &B1_set.buckets[0];
+    Result_Bucket *C0 = &C0_set.result_buckets[0];
+    Result_Bucket *C1 = &C1_set.result_buckets[0];
     
     //遍历所有用户进行多项式三元组的分发
     for (size_t t = 0; t < client_count; t++){
@@ -225,36 +223,36 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
             Result_Bucket *C = &cloud->original.beaver_C.result_buckets[i];
 
             for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
-                mpz_urandomb(A1.coeffs[j], state, cloud->m_bit);
-                mpz_urandomb(B1.coeffs[j], state, cloud->m_bit);
-                mpz_sub(A0.coeffs[j], A->coeffs[j], A1.coeffs[j]);
-                mpz_sub(B0.coeffs[j], B->coeffs[j], B1.coeffs[j]);
+                mpz_urandomb(A1->coeffs[j], state, cloud->m_bit);
+                mpz_urandomb(B1->coeffs[j], state, cloud->m_bit);
+                mpz_sub(A0->coeffs[j], A->coeffs[j], A1->coeffs[j]);
+                mpz_sub(B0->coeffs[j], B->coeffs[j], B1->coeffs[j]);
             }
 
             for (size_t j = 0; j < RESULT_POLY_LEN; ++j) {
-                mpz_urandomb(C1.coeffs[j], state, cloud->m_bit);
-                mpz_sub(C0.coeffs[j], C->coeffs[j], C1.coeffs[j]);
+                mpz_urandomb(C1->coeffs[j], state, cloud->m_bit);
+                mpz_sub(C0->coeffs[j], C->coeffs[j], C1->coeffs[j]);
             }
             
             // 用户拿到属于自己的多项式三元组
             for (size_t j = 0; j < BUCKET_POLY_LEN; ++j){
                 
                 //加密并传输A0
-                aes_encrypt_mpz_buf(&cloud->aes_ctx, A0.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
-                aes_decrypt_mpz_buf(&clients[t]->aes_psi, enc_buf, enc_len, clients[t]->H_Beaver_a.buckets[k].coeffs[j]);
+                aes_encrypt_mpz_buf(&cloud->aes_ctx, A0->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_decrypt_mpz_buf(&clients[t]->aes_psi, enc_buf, enc_len, clients[t]->H_Beaver_a.buckets[i].coeffs[j]);
                 
                 //加密并传输B0
-                aes_encrypt_mpz_buf(&cloud->aes_ctx, B0.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);    
-                aes_decrypt_mpz_buf(&clients[t]->aes_psi, enc_buf, enc_len, clients[t]->H_Beaver_b.buckets[k].coeffs[j]);
+                aes_encrypt_mpz_buf(&cloud->aes_ctx, B0->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);    
+                aes_decrypt_mpz_buf(&clients[t]->aes_psi, enc_buf, enc_len, clients[t]->H_Beaver_b.buckets[i].coeffs[j]);
             }
 
             for (size_t j = 0; j < RESULT_POLY_LEN; ++j){
                 
                 //Beaver云平台侧加密待传输的 C0
-                aes_encrypt_mpz_buf(&cloud->aes_ctx, C0.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_encrypt_mpz_buf(&cloud->aes_ctx, C0->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
 
                 //用户侧解密并存储 C0
-                aes_decrypt_mpz_buf(&clients[t]->aes_psi, enc_buf, enc_len, clients[t]->H_Beaver_c.result_buckets[k].coeffs[j]);
+                aes_decrypt_mpz_buf(&clients[t]->aes_psi, enc_buf, enc_len, clients[t]->H_Beaver_c.result_buckets[i].coeffs[j]);
 
             }
             
@@ -265,18 +263,18 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
             for (size_t j = 0; j < BUCKET_POLY_LEN; ++j){
                 
                 //加密并传输A1
-                aes_encrypt_mpz_buf(&cloud->aes_ctx, A1.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_encrypt_mpz_buf(&cloud->aes_ctx, A1->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
                 aes_decrypt_mpz_buf(&psi_cloud->aes_internal, enc_buf, enc_len, psi_cloud->users[clients[t]->user_id].H_Beaver_a.buckets[user_idx].coeffs[j]);
                 
                 //加密并传输B1
-                aes_encrypt_mpz_buf(&cloud->aes_ctx, B1.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_encrypt_mpz_buf(&cloud->aes_ctx, B1->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
                 aes_decrypt_mpz_buf(&psi_cloud->aes_internal, enc_buf, enc_len, psi_cloud->users[clients[t]->user_id].H_Beaver_b.buckets[user_idx].coeffs[j]);
             }
             
             for (size_t j = 0; j < RESULT_POLY_LEN; ++j){
                 
                 //Beaver云平台侧加密待传输的 C1
-                aes_encrypt_mpz_buf(&cloud->aes_ctx, C1.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_encrypt_mpz_buf(&cloud->aes_ctx, C1->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
 
                 //Psi云平台解密并存储 C1
                 aes_decrypt_mpz_buf(&psi_cloud->aes_internal, enc_buf, enc_len, psi_cloud->users[clients[t]->user_id].H_Beaver_c.result_buckets[user_idx].coeffs[j]);
@@ -294,36 +292,36 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
         Result_Bucket *C = &cloud->original.beaver_C.result_buckets[i];
 
         for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
-            mpz_urandomb(A1.coeffs[j], state, cloud->m_bit);
-            mpz_urandomb(B1.coeffs[j], state, cloud->m_bit);
-            mpz_sub(A0.coeffs[j], A->coeffs[j], A1.coeffs[j]);
-            mpz_sub(B0.coeffs[j], B->coeffs[j], B1.coeffs[j]);
+            mpz_urandomb(A1->coeffs[j], state, cloud->m_bit);
+            mpz_urandomb(B1->coeffs[j], state, cloud->m_bit);
+            mpz_sub(A0->coeffs[j], A->coeffs[j], A1->coeffs[j]);
+            mpz_sub(B0->coeffs[j], B->coeffs[j], B1->coeffs[j]);
         }
 
         for (size_t j = 0; j < RESULT_POLY_LEN; ++j) {
-            mpz_urandomb(C1.coeffs[j], state, cloud->m_bit);
-            mpz_sub(C0.coeffs[j], C->coeffs[j], C1.coeffs[j]);
+            mpz_urandomb(C1->coeffs[j], state, cloud->m_bit);
+            mpz_sub(C0->coeffs[j], C->coeffs[j], C1->coeffs[j]);
         }
             
         // 验证方拿到属于自己的多项式三元组
         for (size_t j = 0; j < BUCKET_POLY_LEN; ++j){
                 
             //加密并传输A0
-            aes_encrypt_mpz_buf(&cloud->aes_ctx, A0.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
-            aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, verify->H_Beaver_a.buckets[k].coeffs[j]);
+            aes_encrypt_mpz_buf(&cloud->aes_ctx, A0->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, verify->H_Beaver_a.buckets[i].coeffs[j]);
                 
             //加密并传输B0
-            aes_encrypt_mpz_buf(&cloud->aes_ctx, B0.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);    
-            aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, verify->H_Beaver_b.buckets[k].coeffs[j]);
+            aes_encrypt_mpz_buf(&cloud->aes_ctx, B0->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);    
+            aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, verify->H_Beaver_b.buckets[i].coeffs[j]);
         }
 
         for (size_t j = 0; j < RESULT_POLY_LEN; ++j){
                 
             //Beaver云平台侧加密待传输的 C0
-            aes_encrypt_mpz_buf(&cloud->aes_ctx, C0.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_encrypt_mpz_buf(&cloud->aes_ctx, C0->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
 
             //用户侧解密并存储 C0
-            aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, verify->H_Beaver_c.result_buckets[k].coeffs[j]);
+            aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, verify->H_Beaver_c.result_buckets[i].coeffs[j]);
 
         }
             
@@ -334,18 +332,18 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
         for (size_t j = 0; j < BUCKET_POLY_LEN; ++j){
                 
             //加密并传输A1
-            aes_encrypt_mpz_buf(&cloud->aes_ctx, A1.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_encrypt_mpz_buf(&cloud->aes_ctx, A1->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
             aes_decrypt_mpz_buf(&psi_cloud->aes_internal, enc_buf, enc_len, psi_cloud->users[0].H_Beaver_a.buckets[verify_idx].coeffs[j]);
                 
             //加密并传输B1
-            aes_encrypt_mpz_buf(&cloud->aes_ctx, B1.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_encrypt_mpz_buf(&cloud->aes_ctx, B1->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
             aes_decrypt_mpz_buf(&psi_cloud->aes_internal, enc_buf, enc_len, psi_cloud->users[0].H_Beaver_b.buckets[verify_idx].coeffs[j]);
         }
             
         for (size_t j = 0; j < RESULT_POLY_LEN; ++j){
                 
             //Beaver云平台侧加密待传输的 C1
-            aes_encrypt_mpz_buf(&cloud->aes_ctx, C1.coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_encrypt_mpz_buf(&cloud->aes_ctx, C1->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
 
             //Psi云平台解密并存储 C1
             aes_decrypt_mpz_buf(&psi_cloud->aes_internal, enc_buf, enc_len, psi_cloud->users[0].H_Beaver_c.result_buckets[verify_idx].coeffs[j]);
@@ -354,12 +352,12 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
 
     printf("[BeaverCloud] 三元组分发完成（验证方 + PSI 云平台）。\n");
     
-    bucket_free((BucketSet*)&A0);
-    bucket_free((BucketSet*)&B0);
-    bucket_free((BucketSet*)&A1);
-    bucket_free((BucketSet*)&B1);
-    result_bucket_free((Result_BucketSet*)&C0);
-    result_bucket_free((Result_BucketSet*)&C1);
+    bucket_free(&A0_set);
+    bucket_free(&B0_set);
+    bucket_free(&A1_set);
+    bucket_free(&B1_set);
+    result_bucket_free(&C0_set);
+    result_bucket_free(&C1_set);
 
     gmp_randclear(state);
     
@@ -603,19 +601,34 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
         }   
         printf("[Beaver] 云平台 PSI 结果计算完成。\n");
         
-        // 清理
-        free(inv_shuffle);
+        // 清理本用户的临时变量
         for (size_t i = 0; i < k; ++i) {
             for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
                 mpz_clear(d0[i][j]);
                 mpz_clear(e0[i][j]);
                 mpz_clear(d_user[i][j]);
                 mpz_clear(e_user[i][j]);
+                mpz_clear(recv_d0[i][j]);
+                mpz_clear(recv_e0[i][j]);
             }
             free(d0[i]); free(e0[i]); free(d_user[i]); free(e_user[i]);
+            free(recv_d0[i]); free(recv_e0[i]);
         }
-    
+        free(d0); free(e0); free(d_user); free(e_user);
+        free(recv_d0); free(recv_e0);
+        
+        for (size_t s = 0; s < k; ++s) {
+            for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
+                mpz_clear(d_cloud[s][j]);
+                mpz_clear(e_cloud[s][j]);
+            }
+            free(d_cloud[s]); free(e_cloud[s]);
+        }
+        free(d_cloud); free(e_cloud);
     }
+    
+    // 释放逆打乱表（在所有用户处理完后）
+    free(inv_shuffle);
 
     printf("[Verify] 开始计算 Beaver 乘法阶段...\n");
     
@@ -629,6 +642,7 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
     result_bucket_init(&psi_cloud->users[0].PSI_result, k);
     
     // ---------- Step 0: 构造逆打乱表 ----------
+    inv_shuffle = malloc(sizeof(size_t) * k);
     for (size_t i = 0; i < k; ++i)
         inv_shuffle[verify->shuffle_table[i]] = i;
     
@@ -755,30 +769,34 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
             mpz_mod(res_cloud->coeffs[j], res_cloud->coeffs[j], mods->M);
         }
         mpz_set(res_cloud->tag, c1->tag);
+    }
     
     // ---------- 清理内存 ----------
-        free(inv_shuffle);
-        for (size_t i = 0; i < k; ++i) {
-            for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
-                mpz_clear(d0[i][j]);
-                mpz_clear(e0[i][j]);
-                mpz_clear(d_user[i][j]);
-                mpz_clear(e_user[i][j]);
-            }
-            free(d0[i]); free(e0[i]); free(d_user[i]); free(e_user[i]);
+    free(inv_shuffle);
+    for (size_t i = 0; i < k; ++i) {
+        for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
+            mpz_clear(d0[i][j]);
+            mpz_clear(e0[i][j]);
+            mpz_clear(d_user[i][j]);
+            mpz_clear(e_user[i][j]);
+            mpz_clear(recv_d0[i][j]);
+            mpz_clear(recv_e0[i][j]);
         }
-
-        for (size_t s = 0; s < k; ++s) {
-            for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
-                mpz_clear(d_cloud[s][j]);
-                mpz_clear(e_cloud[s][j]);
-            }
-            free(d_cloud[s]); free(e_cloud[s]);
-        }
-        free(d_cloud);
-        free(e_cloud);
-    
+        free(d0[i]); free(e0[i]); free(d_user[i]); free(e_user[i]);
+        free(recv_d0[i]); free(recv_e0[i]);
     }
+    free(d0); free(e0); free(d_user); free(e_user);
+    free(recv_d0); free(recv_e0);
+
+    for (size_t s = 0; s < k; ++s) {
+        for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
+            mpz_clear(d_cloud[s][j]);
+            mpz_clear(e_cloud[s][j]);
+        }
+        free(d_cloud[s]); free(e_cloud[s]);
+    }
+    free(d_cloud);
+    free(e_cloud);
 
     
     printf("[Beaver] Beaver 乘法阶段完成。\n");
@@ -808,7 +826,7 @@ void verify_distribute_aes_key(Verify *verify, Client *clients[], int client_cou
         if (!cli) continue;
 
         // RSA 加密密钥并分发
-        rsa_transfer_aes_key(&cli->rsa_ctx, &cli->aes_verify, &verify->aes_verify);
+        rsa_transfer_aes_key(cli->rsa_ctx, &cli->aes_verify, &verify->aes_verify);
     }
 
     printf("[Verify] 所有用户均已收到结果阶段 AES 密钥。\n");
