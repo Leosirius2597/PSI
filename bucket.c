@@ -116,7 +116,7 @@ void bucket_generate(BucketSet *set, unsigned int n, unsigned int m_bit, unsigne
 }
 
 
-void bucket_expand(BucketSet *set) {
+void bucket_expand(BucketSet *set, const mpz_t M) {
     if (!set || !set->buckets) return;
 
     mpz_t tmp;
@@ -128,15 +128,19 @@ void bucket_expand(BucketSet *set) {
         // 初始化：P(x) = 1
         for (size_t k = 0; k < BUCKET_POLY_LEN; ++k)
             mpz_set_ui(b->coeffs[k], 0);
-        mpz_set_ui(b->coeffs[0], 1); // 最高次项系数
+        mpz_set_ui(b->coeffs[0], 1);  // 常数项为1（即 x^0 系数）
 
         // 对每个根 r_i 执行 P(x) *= (x - r_i)
         for (size_t r = 0; r < BUCKET_ROOTS; ++r) {
             // 从高次往低次更新系数（降幂形式）
             for (ssize_t k = r + 1; k >= 1; --k) {
-                // coeff[k] = coeff[k] - r_i * coeff[k-1]
+                // tmp = coeff[k - 1] * roots[r]
                 mpz_mul(tmp, b->coeffs[k - 1], b->roots[r]);
+                mpz_mod(tmp, tmp, M);  // 取模 M
+
+                // coeff[k] = coeff[k] - tmp (mod M)
                 mpz_sub(b->coeffs[k], b->coeffs[k], tmp);
+                mpz_mod(b->coeffs[k], b->coeffs[k], M); // 保证系数非负且取模
             }
         }
     }
@@ -263,16 +267,17 @@ static void multiply_by_monic_linear_desc(const mpz_t *q, size_t d,
 
 // 在多项式中替换一个根：r_out → r_in（就地更新 poly）
 // poly: 降幂系数数组 a[0..degree]，a[0] 为最高次（通常为 1）
-// 实现：P' = (P / (x - r_out)) * (x - r_in)
+// P'(x) = (P / (x - r_out)) * (x - r_in) (mod M)
 void bucket_replace_root(mpz_t *poly, size_t degree,
-                         const mpz_t r_out, const mpz_t r_in)
+                             const mpz_t r_out, const mpz_t r_in,
+                             const mpz_t M)
 {
     if (!poly || degree == 0) return;
 
     mpz_t *q = malloc(sizeof(mpz_t) * degree);
     mpz_t *new_coeffs = malloc(sizeof(mpz_t) * (degree + 1));
     if (!q || !new_coeffs) {
-        fprintf(stderr, "bucket_replace_root: malloc failed\n");
+        fprintf(stderr, "bucket_replace_root_mod: malloc failed\n");
         exit(EXIT_FAILURE);
     }
 
@@ -282,14 +287,18 @@ void bucket_replace_root(mpz_t *poly, size_t degree,
     mpz_t rem;
     mpz_init(rem);
 
+    // 执行多项式合成除法（假设函数本身支持模 M）
     synthetic_division_desc((const mpz_t*)poly, degree, r_out, q, rem);
+    mpz_mod(rem, rem, M);
     if (mpz_sgn(rem) != 0)
         gmp_printf("[警告] 替换时余数 ≠ 0 (rem=%Zd)\n", rem);
 
+    // 执行 (q * (x - r_in)) mod M
     multiply_by_monic_linear_desc((const mpz_t*)q, degree, r_in, new_coeffs);
 
+    // 对结果取模 M
     for (size_t i = 0; i <= degree; ++i)
-        mpz_set(poly[i], new_coeffs[i]);
+        mpz_mod(poly[i], new_coeffs[i], M);
 
     // 清理
     for (size_t i = 0; i < degree; ++i) mpz_clear(q[i]);
@@ -298,6 +307,7 @@ void bucket_replace_root(mpz_t *poly, size_t degree,
     free(q);
     free(new_coeffs);
 }
+
 
 // -----------------------------
 // 桶拷贝函数：深拷贝 roots、coeffs、tag

@@ -1,4 +1,5 @@
 #include "Verify.h"
+#include "hash.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
@@ -118,12 +119,12 @@ void verify_init(Verify *verify, unsigned int n, unsigned int m_bit, unsigned in
 // -----------------------------
 // 构建数据桶：H_P 由 H_r 展开
 // -----------------------------
-void verify_build_buckets(Verify *verify) {
+void verify_build_buckets(Verify *verify, const mpz_t M) {
     if (!verify) return;
 
     printf("[Verify] 构建数据桶 H_P ...\n");
 
-    bucket_expand(&verify->H_P);
+    bucket_expand(&verify->H_P, M);
 
     for (size_t i = 0; i < verify->k; ++i)
         verify->H_P.buckets[i].element_num = 0;
@@ -134,7 +135,7 @@ void verify_build_buckets(Verify *verify) {
 // -----------------------------
 // 在指定桶中插入数据（根）
 // -----------------------------
-void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
+void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data, const mpz_t M) {
     if (!verify || bucket_idx >= verify->k) {
         fprintf(stderr, "[verify_insert_data] 参数错误。\n");
         return;
@@ -155,10 +156,10 @@ void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
     mpz_t r_in;
     mpz_init_set(r_in, data);
 
-    printf("[Verify] 桶 %zu: 插入数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
+    // printf("[Verify] 桶 %zu: 插入数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
 
     // 使用降幂形式替换
-    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, r_out, r_in);
+    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, r_out, r_in, M);
 
     // 更新根表
     mpz_set(root_bucket->roots[r_idx], r_in);
@@ -173,7 +174,7 @@ void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
 // -----------------------------
 // 在指定桶中删除数据（根）
 // -----------------------------
-void verify_delete_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
+void verify_delete_data(Verify *verify, size_t bucket_idx, const mpz_t data, const mpz_t M) {
     if (!verify || bucket_idx >= verify->k) {
         fprintf(stderr, "[verify_delete_data] 参数错误。\n");
         return;
@@ -211,7 +212,7 @@ void verify_delete_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
 
     printf("[Verify] 桶 %zu: 删除数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
 
-    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, data, r_rand);
+    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, data, r_rand, M);
 
     // 更新根表
     mpz_set(root_bucket->roots[r_idx], r_rand);
@@ -226,7 +227,7 @@ void verify_delete_data(Verify *verify, size_t bucket_idx, const mpz_t data) {
 // -----------------------------
 // 数据集中元素插入桶中
 // -----------------------------
-void verify_insert_dataset(Verify *verify) {
+void verify_insert_dataset(Verify *verify, const mpz_t M) {
     if (!verify || !verify->data || !verify->H_P.buckets) {
         fprintf(stderr, "[Verify Insert] 无效参数或未初始化结构。\n");
         return;
@@ -250,10 +251,10 @@ void verify_insert_dataset(Verify *verify) {
         hash48_append(s_tagged, verify->data[i]);
 
         // 4️⃣ 插入数据
-        verify_insert_data(verify, bucket_idx, s_tagged);
+        verify_insert_data(verify, bucket_idx, s_tagged, M);
 
         // 打印进度
-        if ((i + 1) % 128 == 0)
+        if ((i + 1) % 10000 == 0)
             printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
     }
 

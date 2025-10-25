@@ -8,7 +8,7 @@
 // -----------------------------
 // 初始化云平台
 // -----------------------------
-void beaver_cloud_init(BeaverCloud *cloud, unsigned int m_bit, unsigned long seed) {
+void beaver_cloud_init(BeaverCloud *cloud, unsigned int m_bit, unsigned long seed, size_t n) {
     if (!cloud || m_bit == 0) {
         fprintf(stderr, "beaver_cloud_init: invalid parameters\n");
         exit(EXIT_FAILURE);
@@ -18,17 +18,9 @@ void beaver_cloud_init(BeaverCloud *cloud, unsigned int m_bit, unsigned long see
     cloud->m_bit = m_bit;
 
     // 仅初始化空桶结构，不生成随机根或多项式
-    bucket_init(&cloud->original.beaver_A, 3, m_bit);
-    bucket_init(&cloud->original.beaver_B, 3, m_bit);
-    result_bucket_init(&cloud->original.beaver_C, 3);
-
-    bucket_init(&cloud->user.beaver_A, 3, m_bit);
-    bucket_init(&cloud->user.beaver_B, 3, m_bit);
-    result_bucket_init(&cloud->user.beaver_C, 3);
-
-    bucket_init(&cloud->psi.beaver_A, 3, m_bit);
-    bucket_init(&cloud->psi.beaver_B, 3, m_bit);
-    result_bucket_init(&cloud->psi.beaver_C, 3);
+    bucket_init(&cloud->original.beaver_A, n, m_bit);
+    bucket_init(&cloud->original.beaver_B, n, m_bit);
+    result_bucket_init(&cloud->original.beaver_C, n);
 
     // 初始化 RSA / AES 环境
     cloud->rsa_ctx = malloc(sizeof(RSAContext));
@@ -76,14 +68,6 @@ void beaver_cloud_free(BeaverCloud *cloud) {
     bucket_free(&cloud->original.beaver_B);
     result_bucket_free(&cloud->original.beaver_C);
 
-    bucket_free(&cloud->user.beaver_A);
-    bucket_free(&cloud->user.beaver_B);
-    result_bucket_free(&cloud->user.beaver_C);
-
-    bucket_free(&cloud->psi.beaver_A);
-    bucket_free(&cloud->psi.beaver_B);
-    result_bucket_free(&cloud->psi.beaver_C);
-
     EVP_PKEY_free(cloud->rsa_ctx->pkey);
     free(cloud->rsa_ctx);
     memset(&cloud->aes_ctx, 0, sizeof(AESContext));
@@ -91,9 +75,9 @@ void beaver_cloud_free(BeaverCloud *cloud) {
 
 
 // -------------------------------------------------------
-// 生成 Beaver 多项式三元组并拆分为用户与云端份额
+// 生成 Beaver 多项式三元组
 // -------------------------------------------------------
-void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed) {
+void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed, const mpz_t M, size_t n) {
     if (!cloud) {
         fprintf(stderr, "beaver_cloud_generate_triplets: null cloud\n");
         exit(EXIT_FAILURE);
@@ -102,17 +86,27 @@ void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed) {
     if (seed == 0)
         seed = (unsigned long)time(NULL);
 
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state, seed);
+
     printf("[*] Generating Beaver triplets (seed=%lu)...\n", seed);
 
+    mpz_t temp;
+    mpz_init(temp);
     // ========== 1️⃣ 生成原始 Beaver 三元组 ==========
-    bucket_generate(&cloud->original.beaver_A, 3, cloud->m_bit, seed + 1);
-    bucket_generate(&cloud->original.beaver_B, 3, cloud->m_bit, seed + 2);
-    result_bucket_init(&cloud->original.beaver_C, 3);
+    for (size_t i = 0; i < n; i++){
+        for (size_t j = 0; j < BUCKET_POLY_LEN; j++){
+            mpz_urandomb(temp, state, 20);
+            mpz_set(cloud->original.beaver_A.buckets[i].coeffs[j],temp); 
+            mpz_urandomb(temp, state, 20);
+            mpz_set(cloud->original.beaver_B.buckets[i].coeffs[j],temp);   
+        }    
+    }
+    
+    gmp_randclear(state);
 
-    bucket_expand(&cloud->original.beaver_A);
-    bucket_expand(&cloud->original.beaver_B);
-
-    for (size_t i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         for (size_t j = 0; j < RESULT_POLY_LEN; ++j)
             mpz_set_ui(cloud->original.beaver_C.result_buckets[i].coeffs[j], 0);
 
@@ -122,59 +116,14 @@ void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed) {
                 if (idx < RESULT_POLY_LEN) {
                     mpz_t tmp;
                     mpz_init(tmp);
-                    mpz_mul(tmp,
-                            cloud->original.beaver_A.buckets[i].coeffs[p],
-                            cloud->original.beaver_B.buckets[i].coeffs[q]);
-                    mpz_add(cloud->original.beaver_C.result_buckets[i].coeffs[idx],
-                            cloud->original.beaver_C.result_buckets[i].coeffs[idx],
-                            tmp);
+                    mpz_mul(tmp, cloud->original.beaver_A.buckets[i].coeffs[p], cloud->original.beaver_B.buckets[i].coeffs[q]);
+                    mpz_add(cloud->original.beaver_C.result_buckets[i].coeffs[idx], cloud->original.beaver_C.result_buckets[i].coeffs[idx], tmp);
                     mpz_clear(tmp);
                 }
             }
         }
     }
 
-    // ========== 2️⃣ 拆分为用户端与云端份额 ==========
-    gmp_randstate_t state;
-    gmp_randinit_default(state);
-    gmp_randseed_ui(state, seed + 999);
-
-    for (size_t i = 0; i < 3; ++i) {
-        // A, B 是 BUCKET_POLY_LEN 长
-        for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
-            mpz_t rand_share;
-            mpz_init(rand_share);
-            mpz_urandomb(rand_share, state, cloud->m_bit);
-
-            // 用户份 = 随机份
-            mpz_set(cloud->user.beaver_A.buckets[i].coeffs[j], rand_share);
-            mpz_set(cloud->user.beaver_B.buckets[i].coeffs[j], rand_share);
-
-            // 云端份 = 原始 - 用户份
-            mpz_sub(cloud->psi.beaver_A.buckets[i].coeffs[j],
-                    cloud->original.beaver_A.buckets[i].coeffs[j],
-                    rand_share);
-            mpz_sub(cloud->psi.beaver_B.buckets[i].coeffs[j],
-                    cloud->original.beaver_B.buckets[i].coeffs[j],
-                    rand_share);
-
-            mpz_clear(rand_share);
-        }
-
-        // C(x) 拆分
-        for (size_t j = 0; j < RESULT_POLY_LEN; ++j) {
-            mpz_t rand_share;
-            mpz_init(rand_share);
-            mpz_urandomb(rand_share, state, cloud->m_bit);
-
-            mpz_set(cloud->user.beaver_C.result_buckets[i].coeffs[j], rand_share);
-            mpz_sub(cloud->psi.beaver_C.result_buckets[i].coeffs[j],
-                    cloud->original.beaver_C.result_buckets[i].coeffs[j],
-                    rand_share);
-            mpz_clear(rand_share);
-        }
-    }
-
-    gmp_randclear(state);
+    mpz_clear(temp);
     printf("[✓] Beaver triplet generation + share split complete.\n");
 }

@@ -99,14 +99,14 @@ void client_init(Client *cli, unsigned int n, unsigned int m_bit, unsigned int k
 // Client 生成数据桶
 // ===========================
 // 构建数据桶（用随机根展开多项式）
-void client_build_buckets(Client *cli) {
+void client_build_buckets(Client *cli, const mpz_t M) {
     if (!cli) return;
 
     printf("[Client] 构建数据桶 H_P ...\n");
 
     // H_P 的随机根已在 client_init() 时从 H_r 拷贝
     // 直接展开成多项式即可
-    bucket_expand(&cli->H_P);
+    bucket_expand(&cli->H_P, M);
 
     // 初始化元素数
     for (size_t i = 0; i < cli->k; ++i)
@@ -118,7 +118,7 @@ void client_build_buckets(Client *cli) {
 // -----------------------------
 // 在指定桶中插入数据（根）
 // -----------------------------
-void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t data) {
+void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t data, const mpz_t M) {
     if (!cli || bucket_idx >= cli->k) {
         fprintf(stderr, "[client_insert_data] 参数错误。\n");
         return;
@@ -141,10 +141,10 @@ void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t data) {
     mpz_t r_in;
     mpz_init_set(r_in, data);
 
-    printf("[Client] 桶 %zu: 插入数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
+    // printf("[Client] 桶 %zu: 插入数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
 
     // 多项式替换
-    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, r_out, r_in);
+    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, r_out, r_in, M);
 
     // 更新根表
     mpz_set(root_bucket->roots[r_idx], r_in);
@@ -158,7 +158,7 @@ void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t data) {
 // -----------------------------
 // 在指定桶中删除数据（根）
 // -----------------------------
-void client_delete_data(Client *cli, size_t bucket_idx, const mpz_t data) {
+void client_delete_data(Client *cli, size_t bucket_idx, const mpz_t data, const mpz_t M) {
     if (!cli || bucket_idx >= cli->k) {
         fprintf(stderr, "[client_delete_data] 参数错误。\n");
         return;
@@ -198,7 +198,7 @@ void client_delete_data(Client *cli, size_t bucket_idx, const mpz_t data) {
     printf("[Client] 桶 %zu: 删除数据 → 替换根 #%zu。\n", bucket_idx, r_idx);
 
     // 多项式替换
-    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, data, r_rand);
+    bucket_replace_root(poly_bucket->coeffs, BUCKET_ROOTS, data, r_rand, M);
 
     // 更新根表
     mpz_set(root_bucket->roots[r_idx], r_rand);
@@ -248,7 +248,7 @@ void client_generate_shuffle_table(Client *cli, unsigned long seed) {
 }
 
 // 将数据从数据集中插入到桶中
-void client_insert_dataset(Client *cli) {
+void client_insert_dataset(Client *cli, const mpz_t M) {
     if (!cli || !cli->data || !cli->H_P.buckets) {
         fprintf(stderr, "[Client Insert] 无效参数或未初始化的桶结构\n");
         return;
@@ -270,9 +270,9 @@ void client_insert_dataset(Client *cli) {
         hash48_append(s_tagged, cli->data[i]);
 
         // 3️⃣ 插入数据（利用 client_insert_data 函数）
-        client_insert_data(cli, bucket_idx, s_tagged);
+        client_insert_data(cli, bucket_idx, s_tagged, M);
 
-        if ((i + 1) % 128 == 0)
+        if ((i + 1) % 10000 == 0)
             printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
     }
 

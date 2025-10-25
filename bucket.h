@@ -41,13 +41,13 @@ void result_bucket_init(Result_BucketSet *result_set, unsigned int n);
 void bucket_generate(BucketSet *set, unsigned int n, unsigned int m_bit, unsigned long seed);
 
 // 根据根展开多项式：P(x) = ∏ (x - r_i)
-void bucket_expand(BucketSet *set);
+void bucket_expand(BucketSet *set, const mpz_t M);
 
 // 在多项式中替换一个根：r_out → r_in（就地更新系数数组）
 // poly: 降幂系数数组（长度 degree+1，poly[0] 为最高次项系数）
 // degree: 多项式次数（例如 127）
 // r_out, r_in: 被替换的旧根与新根（mpz_t）
-void bucket_replace_root(mpz_t *poly, size_t degree, const mpz_t r_out, const mpz_t r_in);
+void bucket_replace_root(mpz_t *poly, size_t degree, const mpz_t r_out, const mpz_t r_in, const mpz_t M);
                          
                          
 // 拷贝桶结构

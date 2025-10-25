@@ -47,17 +47,20 @@ void client_init(Client *cli, unsigned int n, unsigned int m_bit, unsigned int k
 
 // 用户生成数据桶 H_P 的过程：
 // 根据桶内随机根展开多项式 P(x) = ∏(x - r_i)
-void client_build_buckets(Client *cli);
+void client_build_buckets(Client *cli, const mpz_t M);
 
 // 向指定桶插入一个数据（根）
 // bucket_idx : 桶编号
 // r_in       : 插入数据（GMP整数）
-void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t r_in);
+void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t data, const mpz_t M);
+
+// 插入整个数据集到桶中
+void client_insert_dataset(Client *cli, const mpz_t M);
 
 // 从指定桶删除一个数据（根）
 // bucket_idx : 桶编号
 // r_out      : 要删除的数据（GMP整数）
-void client_delete_data(Client *cli, size_t bucket_idx, const mpz_t r_out);
+void client_delete_data(Client *cli, size_t bucket_idx, const mpz_t data, const mpz_t M);
 
 
 // 生成桶打乱表（Fisher–Yates 洗牌，但不实际重排桶）
