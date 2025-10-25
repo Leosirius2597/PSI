@@ -1,4 +1,5 @@
 #include "PSI.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -713,7 +714,7 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
             aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, d_user[i][j]);
 
             // 加密并传输e
-            aes_encrypt_mpz_buf(&psi_cloud->aes_internal, e_cloud[s][j], enc_buf, sizeof(enc_buf), enc_len);
+            aes_encrypt_mpz_buf(&psi_cloud->aes_internal, e_cloud[s][j], enc_buf, sizeof(enc_buf), &enc_len);
             aes_decrypt_mpz_buf(&verify->aes_psi, enc_buf, enc_len, e_user[i][j]);
         }
     }
@@ -836,7 +837,7 @@ void send_result_to_verify(Client *clients[], int client_count,  PSICloud *psi_c
 
     for (size_t t = 0; t < client_count; t++){
         
-        printf("[Client→Verify] 用户 %lu 开始发送 PSI 结果桶...\n", mpz_get_ui(clients[t]->user_id));
+        printf("[Client→Verify] 用户 %lu 开始发送 PSI 结果桶...\n", (unsigned long)clients[t]->user_id);
             
         // ---------- 用户将结果发送给验证方 ----------
         for (size_t i = 0; i < k; i++){
@@ -854,7 +855,7 @@ void send_result_to_verify(Client *clients[], int client_count,  PSICloud *psi_c
 
             }  
         } 
-        printf("[Client→Verify] 用户 %lu 的结果桶已成功传输并合并（模 M）。\n", mpz_get_ui(clients[t]->user_id));
+        printf("[Client→Verify] 用户 %lu 的结果桶已成功传输并合并（模 M）。\n", (unsigned long)clients[t]->user_id);
     }
 
     printf("[PSI→Verify] 云平台开始向验证方发送云平台计算 PSI 结果...\n");
