@@ -11,10 +11,8 @@ typedef struct {
 } BeaverTripletSet;
 
 typedef struct {
+    
     BeaverTripletSet original;  // 原始 Beaver 三元组
-    BeaverTripletSet user;      // 用户端三元组
-    BeaverTripletSet psi;       // PSI 平台三元组
-
     RSAContext *rsa_ctx;         // 云平台 RSA 密钥上下文
     AESContext aes_ctx;         // 云平台 AES 会话密钥上下文
 
@@ -22,7 +20,7 @@ typedef struct {
 } BeaverCloud;
 
 // 初始化云平台（生成 Beaver 三元组 + RSA 密钥）
-void beaver_cloud_init(BeaverCloud *cloud, unsigned int m_bit, unsigned long seed);
+void beaver_cloud_init(BeaverCloud *cloud, unsigned int m_bit, unsigned long seed, size_t n);
 
 // 打印云平台信息（包括密钥状态）
 void beaver_cloud_print(const BeaverCloud *cloud);
@@ -32,7 +30,7 @@ void beaver_cloud_set_aes(BeaverCloud *cloud, const unsigned char *key, const un
                           
 // 生成 Beaver 三元组（降幂多项式形式）
 // 包含原始生成 + 用户 / PSI 拆分
-void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed);
+void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed, const mpz_t M, size_t n);
 
 // 释放云平台资源
 void beaver_cloud_free(BeaverCloud *cloud);
