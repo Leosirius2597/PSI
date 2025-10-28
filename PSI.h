@@ -23,13 +23,13 @@
 void psi_sync_all_clients(PSICloud *cloud, Client *clients[], size_t client_count, Verify *verify, BeaverCloud *beaver);
                             
 // 用户上传桶
-void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSICloud *cloud);
+void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSICloud *cloud, mpz_t M);
 
 // 验证方上传桶
-void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud);
+void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud, mpz_t M);
 
 // beaver 云平台分发多项式beaver三元组
-void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], size_t client_count, PSICloud *psi_cloud, Verify *verify);
+void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], size_t client_count, PSICloud *psi_cloud, Verify *verify, const mpz_t M);
 
 // 计算多项式Beaver三元组结果
 void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud *psi_cloud, Verify *verify, const ModSystem *mods);

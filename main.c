@@ -41,33 +41,33 @@ int main(){
     for (size_t i = 0; i < client_count; ++i) {
         clients[i] = malloc(sizeof(Client));
         client_init(clients[i], DATASET_NUM, DATA_BIT, BUCKET_NUM, 123, i+1);
-        client_build_buckets(clients[i]);
-        client_insert_dataset(clients[i]);
+        client_build_buckets(clients[i], mods.M);
+        client_insert_dataset(clients[i], mods.M);
     }
 
     // 初始化验证方
     verify_init(&verify, DATASET_NUM, DATA_BIT, BUCKET_NUM, 456);
-    verify_build_buckets(&verify);
-    verify_insert_dataset(&verify);
+    verify_build_buckets(&verify, mods.M);
+    verify_insert_dataset(&verify, mods.M);
 
     // 初始化PSI云平台
     psi_cloud_init(&psi_cloud, client_count+1, BUCKET_NUM, DATA_BIT, 123);
 
     // 初始化Beaver云平台
-    beaver_cloud_init(&beaver_cloud, DATA_BIT, 123);
+    beaver_cloud_init(&beaver_cloud, DATA_BIT, 123, BUCKET_NUM);
 
     // 进行PSI
     // 第一步，PSI云平台将AES密钥发送给各方
     psi_sync_all_clients(&psi_cloud, clients, client_count, &verify, &beaver_cloud);
 
     // 第二步，用户上传桶
-    Clients_send_encrypted_buckets(clients, client_count, &psi_cloud);
+    Clients_send_encrypted_buckets(clients, client_count, &psi_cloud, mods.M);
     
     // 第三步，验证方上传桶
-    psi_send_encrypted_buckets_verify(&verify, &psi_cloud);
+    psi_send_encrypted_buckets_verify(&verify, &psi_cloud, mods.M);
 
     // 第四步，Beaver云平台分发多项式Beaver三元组
-    beaver_cloud_distribute_to_client(&beaver_cloud, clients, client_count, &psi_cloud, &verify);
+    beaver_cloud_distribute_to_client(&beaver_cloud, clients, client_count, &psi_cloud, &verify, mods.M);
 
     // 第五步，计算多项式Beaver三元组结果
     beaver_compute_multiplication(clients, client_count, &psi_cloud, &verify, &mods);

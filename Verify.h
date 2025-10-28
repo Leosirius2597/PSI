@@ -42,16 +42,16 @@ typedef struct {
 void verify_init(Verify *verify, unsigned int n, unsigned int m_bit, unsigned int k, unsigned long seed);
 
 // 构建数据桶（H_P 由 H_r 随机根展开）
-void verify_build_buckets(Verify *verify);
+void verify_build_buckets(Verify *verify, const mpz_t M);
 
 // 打印验证方状态报告
 void verify_print_report(const Verify *verify);
 
-void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data);
+void verify_insert_data(Verify *verify, size_t bucket_idx, const mpz_t data, const mpz_t M);
 
-void verify_delete_data(Verify *verify, size_t bucket_idx, const mpz_t data);
+void verify_delete_data(Verify *verify, size_t bucket_idx, const mpz_t data, const mpz_t M);
 
-void verify_insert_dataset(Verify *verify);
+void verify_insert_dataset(Verify *verify, const mpz_t M);
 
 // 释放所有资源
 void verify_free(Verify *verify);

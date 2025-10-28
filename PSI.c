@@ -84,17 +84,22 @@ static void encrypt_and_send_bucket(const AESContext *aes_ctx, const Bucket *src
 // ===============================
 // 用户上传桶 （没有拆分）
 // ===============================
-void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSICloud *cloud)
+void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSICloud *cloud, mpz_t M)
 {
 
     if (!clients || !cloud) {
         fprintf(stderr, "[PSI] 参数错误。\n");
         return;
     }
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state, (unsigned long)time(NULL));
 
     //中间参数
     unsigned char enc_buf[4096];
     int enc_len = 0;
+    mpz_t temp_p0, temp_p1, temp_w0, temp_w1;
+    mpz_inits(temp_p0, temp_p1, temp_w0, temp_w1, NULL);
 
     printf("[PSI] 用户开始发送桶...\n");
 
@@ -110,13 +115,27 @@ void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSIClou
             // 按打乱表传输桶到云平台
             // -----------------------
             for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
-            
+                
+                mpz_urandomb(temp_p0, state, clients[t]->m_bit);
+                mpz_mod(temp_p0, temp_p0, M);
+                mpz_sub(temp_p1, srcP->coeffs[j], temp_p0);
+                mpz_mod(temp_p1, temp_p1, M);
+                
+                mpz_set(srcP->coeffs[j], temp_p0);
+
                 // 将P桶传输（顺序已经打乱）
-                aes_encrypt_mpz_buf(&clients[t]->aes_psi, srcP->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_encrypt_mpz_buf(&clients[t]->aes_psi, temp_p1, enc_buf, sizeof(enc_buf), &enc_len);
                 aes_decrypt_mpz_buf(&cloud->aes_internal, enc_buf, enc_len, dstP->coeffs[j]);
+
+                mpz_urandomb(temp_w0, state, clients[t]->m_bit);
+                mpz_mod(temp_w0, temp_w0, M);
+                mpz_sub(temp_w1, srcW->coeffs[j], temp_w0);
+                mpz_mod(temp_w1, temp_w1, M);
+
+                mpz_set(srcW->coeffs[j], temp_w0);
             
                 //将W桶传输（顺序已经打乱）
-                aes_encrypt_mpz_buf(&clients[t]->aes_psi, srcW->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+                aes_encrypt_mpz_buf(&clients[t]->aes_psi, temp_w1, enc_buf, sizeof(enc_buf), &enc_len);
                 aes_decrypt_mpz_buf(&cloud->aes_internal, enc_buf, enc_len, dstW->coeffs[j]);
             }
 
@@ -126,23 +145,31 @@ void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSIClou
 
         }
     }
-    
+
+    mpz_clears(temp_p0, temp_p1, temp_w0, temp_w1, NULL);
+    gmp_randclear(state);
     printf("[PSI] 用户桶发送完成（已打乱并存入云平台）。\n");
 }
 
 // ===========================================
 // 验证方上传桶（没有拆分）
 // ===========================================
-void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud)
+void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud, mpz_t M)
 {
     if (!verify || !cloud) {
         fprintf(stderr, "[PSI] 参数错误。\n");
         return;
     }
 
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    gmp_randseed_ui(state, (unsigned long)time(NULL));
+
     //中间参数
     unsigned char enc_buf[4096];
     int enc_len = 0;
+    mpz_t temp_p0, temp_p1, temp_w0, temp_w1;
+    mpz_inits(temp_p0, temp_p1, temp_w0, temp_w1, NULL);
 
     printf("[PSI] 验证方开始发送桶...\n");
 
@@ -157,13 +184,27 @@ void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud)
         // 按打乱表传输桶到云平台
         // -----------------------
         for (size_t j = 0; j < BUCKET_POLY_LEN; ++j) {
+
+            mpz_urandomb(temp_p0, state, verify->m_bit);
+            mpz_mod(temp_p0, temp_p0, M);
+            mpz_sub(temp_p1, srcP->coeffs[j], temp_p0);
+            mpz_mod(temp_p1, temp_p1, M);
+                
+            mpz_set(srcP->coeffs[j], temp_p0);
             
             // 将P桶传输（顺序已经打乱）
-            aes_encrypt_mpz_buf(&verify->aes_psi, srcP->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_encrypt_mpz_buf(&verify->aes_psi, temp_p1, enc_buf, sizeof(enc_buf), &enc_len);
             aes_decrypt_mpz_buf(&cloud->aes_internal, enc_buf, enc_len, dstP->coeffs[j]);
+
+            mpz_urandomb(temp_w0, state, verify->m_bit);
+            mpz_mod(temp_w0, temp_w0, M);
+            mpz_sub(temp_w1, srcW->coeffs[j], temp_w0);
+            mpz_mod(temp_w1, temp_w1, M);
+                
+            mpz_set(srcW->coeffs[j], temp_w0);
             
             //将W桶传输（顺序已经打乱）
-            aes_encrypt_mpz_buf(&verify->aes_psi, srcW->coeffs[j], enc_buf, sizeof(enc_buf), &enc_len);
+            aes_encrypt_mpz_buf(&verify->aes_psi, temp_w1, enc_buf, sizeof(enc_buf), &enc_len);
             aes_decrypt_mpz_buf(&cloud->aes_internal, enc_buf, enc_len, dstW->coeffs[j]);
         }
 
@@ -172,6 +213,8 @@ void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud)
         aes_decrypt_mpz_buf(&cloud->aes_internal, enc_buf, enc_len, dstP->tag);
     }
 
+    mpz_clears(temp_p0, temp_p1, temp_w0, temp_w1, NULL);
+    gmp_randclear(state);
     printf("[PSI] 验证方桶发送完成（已打乱并写入云平台）。\n");
 }
 
@@ -181,7 +224,7 @@ void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud)
 //   BeaverCloud → 分发三元组给 用户/验证方 与 PSI 云平台
 //   （带 AES 加密解密模拟 + 桶顺序打乱）
 // ===========================================================
-void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], size_t client_count, PSICloud *psi_cloud, Verify *verify){
+void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], size_t client_count, PSICloud *psi_cloud, Verify *verify, const mpz_t M){
 
     printf("[BeaverCloud] 开始向用户/验证方与 PSI 云平台分发 Beaver 三元组...\n");
 
@@ -199,12 +242,12 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
     // --- 临时随机拆分 ---
     BucketSet A0_set, B0_set, A1_set, B1_set;
     Result_BucketSet C0_set, C1_set;
-    bucket_init(&A0_set, 1, cloud->m_bit);
-    bucket_init(&B0_set, 1, cloud->m_bit);
-    bucket_init(&A1_set, 1, cloud->m_bit);
-    bucket_init(&B1_set, 1, cloud->m_bit);
-    result_bucket_init(&C0_set, 1);
-    result_bucket_init(&C1_set, 1);
+    bucket_init(&A0_set, verify->k, cloud->m_bit);
+    bucket_init(&B0_set, verify->k, cloud->m_bit);
+    bucket_init(&A1_set, verify->k, cloud->m_bit);
+    bucket_init(&B1_set, verify->k, cloud->m_bit);
+    result_bucket_init(&C0_set, verify->k);
+    result_bucket_init(&C1_set, verify->k);
     
     // 使用第一个桶作为临时存储
     Bucket *A0 = &A0_set.buckets[0];
@@ -215,7 +258,10 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
     Result_Bucket *C1 = &C1_set.result_buckets[0];
     
     //遍历所有用户进行多项式三元组的分发
-    for (size_t t = 0; t < client_count; t++){
+    for (size_t t = 1; t < client_count + 1; t++){
+        
+        // Beaver云平台生成多项式Beaver三元组
+        beaver_cloud_generate_triplets(&cloud, 127, M, clients[t]->k);
         // 遍历每个桶生成并分发
         for (size_t i = 0; i < k; ++i) {
             Bucket *A = &cloud->original.beaver_A.buckets[i];
@@ -285,6 +331,9 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
     printf("[BeaverCloud] 三元组分发完成（用户 + PSI 云平台）。\n");
 
     // 验证方拿到自己的Beaver多项式三元组
+    // Beaver云平台生成多项式三元组
+    beaver_cloud_generate_triplets(&cloud, 125, M, verify->k);
+
     // 遍历每个桶生成并分发
     for (size_t i = 0; i < k; ++i) {
         Bucket *A = &cloud->original.beaver_A.buckets[i];
@@ -365,7 +414,7 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
 
 
 // ===========================================================
-//   FFT方法计算多个小模数下的多项式乘法（没改过）
+//   FFT方法计算多个小模数下的多项式乘法
 // ===========================================================
 void poly_modular_fft_compute(mpz_t *result, const mpz_t *polyA, const mpz_t *polyB, size_t lenA, size_t lenB, const ModSystem *mods, int op_type)
 {
