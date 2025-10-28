@@ -258,10 +258,10 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
     Result_Bucket *C1 = &C1_set.result_buckets[0];
     
     //遍历所有用户进行多项式三元组的分发
-    for (size_t t = 1; t < client_count + 1; t++){
+    for (size_t t = 0; t < client_count; t++){
         
         // Beaver云平台生成多项式Beaver三元组
-        beaver_cloud_generate_triplets(&cloud, 127, M, clients[t]->k);
+        beaver_cloud_generate_triplets(cloud, 127, M, clients[t]->k);
         // 遍历每个桶生成并分发
         for (size_t i = 0; i < k; ++i) {
             Bucket *A = &cloud->original.beaver_A.buckets[i];
@@ -332,7 +332,7 @@ void beaver_cloud_distribute_to_client(BeaverCloud *cloud, Client *clients[], si
 
     // 验证方拿到自己的Beaver多项式三元组
     // Beaver云平台生成多项式三元组
-    beaver_cloud_generate_triplets(&cloud, 125, M, verify->k);
+    beaver_cloud_generate_triplets(cloud, 125, M, verify->k);
 
     // 遍历每个桶生成并分发
     for (size_t i = 0; i < k; ++i) {
