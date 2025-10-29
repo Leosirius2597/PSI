@@ -90,7 +90,7 @@ void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed, cons
     gmp_randinit_default(state);
     gmp_randseed_ui(state, seed);
 
-    printf("[*] Generating Beaver triplets (seed=%lu)...\n", seed);
+    printf("[*] 生成多项式Beaver三元组中 (seed=%lu)...\n", seed);
 
     mpz_t temp;
     mpz_init(temp);
@@ -125,5 +125,5 @@ void beaver_cloud_generate_triplets(BeaverCloud *cloud, unsigned long seed, cons
     }
 
     mpz_clear(temp);
-    printf("[✓] Beaver triplet generation + share split complete.\n");
+    printf("[✓] Beaver多项式三元组生成完毕\n");
 }

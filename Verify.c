@@ -254,8 +254,8 @@ void verify_insert_dataset(Verify *verify, const mpz_t M) {
         verify_insert_data(verify, bucket_idx, s_tagged, M);
 
         // 打印进度
-        if ((i + 1) % 10000 == 0)
-            printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
+        // if ((i + 1) % 10000 == 0)
+        //    printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
     }
 
     mpz_clear(s_tagged);

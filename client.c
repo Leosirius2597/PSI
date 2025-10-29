@@ -272,8 +272,8 @@ void client_insert_dataset(Client *cli, const mpz_t M) {
         // 3️⃣ 插入数据（利用 client_insert_data 函数）
         client_insert_data(cli, bucket_idx, s_tagged, M);
 
-        if ((i + 1) % 10000 == 0)
-            printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
+        //if ((i + 1) % 10000 == 0)
+        //    printf("  已插入 %zu / %zu 条数据...\n", i + 1, total);
     }
 
     mpz_clear(s_tagged);
