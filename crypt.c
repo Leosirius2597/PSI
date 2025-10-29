@@ -53,8 +53,8 @@ int rsa_transfer_aes_key(RSAContext *A, AESContext *A_AES, const AESContext *B_A
         abort();
     }
 
-    printf("🔍 RSAContext: %p, rsa=%p, pkey=%p\n", (void*)A, (void*)A->rsa, (void*)A->pkey);
-    printf("RSAContext addr=%p, size=%zu\n", (void*) &A, sizeof(RSAContext));
+    //printf("🔍 RSAContext: %p, rsa=%p, pkey=%p\n", (void*)A, (void*)A->rsa, (void*)A->pkey);
+    //printf("RSAContext addr=%p, size=%zu\n", (void*) &A, sizeof(RSAContext));
 
 
     if (!A->rsa) {
