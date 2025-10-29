@@ -82,7 +82,7 @@ static void encrypt_and_send_bucket(const AESContext *aes_ctx, const Bucket *src
 
 
 // ===============================
-// 用户上传桶 （没有拆分）
+// 用户上传桶 
 // ===============================
 void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSICloud *cloud, mpz_t M)
 {
@@ -152,7 +152,7 @@ void Clients_send_encrypted_buckets(Client *clients[], int client_count, PSIClou
 }
 
 // ===========================================
-// 验证方上传桶（没有拆分）
+// 验证方上传桶
 // ===========================================
 void psi_send_encrypted_buckets_verify(Verify *verify, PSICloud *cloud, mpz_t M)
 {
