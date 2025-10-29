@@ -4,6 +4,7 @@
 #include "PSI_Cloud.h"
 #include "Verify.h"
 #include "Beaver_Cloud.h"
+#include <time.h>
 
 // 定义数据集大小2^k
 #define DATASET_NUM 10
@@ -15,6 +16,9 @@
 #define DATA_BIT 40
 
 int main(){
+
+    // 生成计时点
+    clock_t t_init_begin, t_init_end, t_outsrc_begin, t_outsrc_end, t_compute_begin, t_compute_end, t_check_begin, t_check_end;
 
     // 用户数量
     int client_count = 3;
@@ -34,6 +38,7 @@ int main(){
     // 生成模数
     ModSystem mods;
 
+    t_init_begin = clock();
     //初始化模数
     modsystem_init_auto(&mods, 200, 123);
 
@@ -55,31 +60,48 @@ int main(){
 
     // 初始化Beaver云平台
     beaver_cloud_init(&beaver_cloud, DATA_BIT, 123, BUCKET_NUM);
+    
+    t_init_end = clock();
+    printf("初始化阶段耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC);
 
     // 进行PSI
     // 第一步，PSI云平台将AES密钥发送给各方
     psi_sync_all_clients(&psi_cloud, clients, client_count, &verify, &beaver_cloud);
 
-    // 第二步，用户上传桶
-    Clients_send_encrypted_buckets(clients, client_count, &psi_cloud, mods.M);
-    
-    // 第三步，验证方上传桶
-    psi_send_encrypted_buckets_verify(&verify, &psi_cloud, mods.M);
-
-    // 第四步，Beaver云平台分发多项式Beaver三元组
+    // 第二步，Beaver云平台分发多项式Beaver三元组
     beaver_cloud_distribute_to_client(&beaver_cloud, clients, client_count, &psi_cloud, &verify, mods.M);
 
+    t_outsrc_begin = clock();
+
+    // 第三步，用户上传桶
+    Clients_send_encrypted_buckets(clients, client_count, &psi_cloud, mods.M);
+    
+    // 第四步，验证方上传桶
+    psi_send_encrypted_buckets_verify(&verify, &psi_cloud, mods.M);
+
+    t_outsrc_end = clock();
+
+    printf("托管阶段耗时：%.3f 秒\n", (double)(t_outsrc_end - t_outsrc_begin)/CLOCKS_PER_SEC);
+
+    t_compute_begin = clock();
     // 第五步，计算多项式Beaver三元组结果
     beaver_compute_multiplication(clients, client_count, &psi_cloud, &verify, &mods);
+
+    t_compute_end = clock();
+    printf("PSI计算阶段耗时：%.3f 秒\n", (double)(t_compute_end - t_compute_begin)/CLOCKS_PER_SEC);
 
     // 第六步，验证方分发AES密钥给用户
     verify_distribute_aes_key(&verify, clients, client_count);
 
     // 第七步，发送PSI结果到验证方
     send_result_to_verify(clients, client_count, &psi_cloud, &verify, &mods);
-
+    
+    t_check_begin = clock();
     // 最后一步，验证方合并结果并检查交集
     verify_merge_and_check_intersection(&verify, &mods);
+
+    t_check_end = clock();
+    printf("检查阶段耗时：%.3f 秒\n", (double)(t_check_end - t_check_begin)/CLOCKS_PER_SEC);
 
     // 释放内存
     // 释放客户端

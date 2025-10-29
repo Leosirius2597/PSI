@@ -1036,6 +1036,6 @@ void verify_merge_and_check_intersection(Verify *verify,const ModSystem *mods){
         mpz_clears(s_prime, eval, power, term, NULL);
     }
 
-    printf("[Verify] 交集检查完成，共发现 %zu 个交集元素。\n", intersection_count);
+    //printf("[Verify] 交集检查完成，共发现 %zu 个交集元素。\n", intersection_count);
 }
 
