@@ -15,7 +15,7 @@ int main(){
     clock_t t_init_begin, t_init_end, t_outsrc_begin, t_outsrc_end, t_compute_begin, t_compute_end, t_check_begin, t_check_end;
 
     // 用户数量
-    int client_count = 3;
+    int client_count = 1;
 
     // 数据集大小
     int DATASET_NUM;
@@ -25,7 +25,7 @@ int main(){
 
     // 不同数据集大小对应的桶数量
     int dataset_sizes[10] = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20};
-    int bucket_counts[10] = {21, 42, 84, 168, 337, 675, 1315, 2703, 5365, 10730, 21460};
+    int bucket_counts[10] = {3, 6, 12, 23, 45, 91, 182, 365, 733, 1474, 2962};
     
     for (size_t i = 0; i < 10; i++){
     
@@ -44,13 +44,14 @@ int main(){
         // 生成客户端数组
         Client **clients = malloc(sizeof(Client*) * client_count);
 
-        t_init_begin = clock();
+        
         // 生成模数
         ModSystem mods;
 
         //初始化模数
-        modsystem_init_auto(&mods, 200, 123);
+        modsystem_init_auto(&mods, 40, 123);
 
+        t_init_begin = clock();
         // 初始化客户端
         for (size_t i = 0; i < client_count; ++i) {
             clients[i] = malloc(sizeof(Client));
@@ -58,6 +59,9 @@ int main(){
             client_build_buckets(clients[i], mods.M);
             client_insert_dataset(clients[i], mods.M);
         }
+
+        t_init_end = clock();
+        printf("单个用户初始化耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC / client_count);
 
         // 初始化验证方
         verify_init(&verify, DATASET_NUM, DATA_BIT, BUCKET_NUM, 456);
@@ -70,8 +74,7 @@ int main(){
         // 初始化Beaver云平台
         beaver_cloud_init(&beaver_cloud, DATA_BIT, 123, BUCKET_NUM);
         
-        t_init_end = clock();
-        printf("初始化阶段耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC);
+        
 
         // 进行PSI
         // 第一步，PSI云平台将AES密钥发送给各方
@@ -95,7 +98,7 @@ int main(){
         beaver_compute_multiplication(clients, client_count, &psi_cloud, &verify, &mods);
 
         t_compute_end = clock();
-        printf("PSI计算阶段耗时：%.3f 秒\n", (double)(t_compute_end - t_compute_begin)/CLOCKS_PER_SEC);
+        printf("PSI计算阶段总耗时：%.3f 秒\n", (double)(t_compute_end - t_compute_begin)/CLOCKS_PER_SEC);
 
         // 第六步，验证方分发AES密钥给用户
         verify_distribute_aes_key(&verify, clients, client_count);

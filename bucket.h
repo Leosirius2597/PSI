@@ -4,9 +4,9 @@
 #include <gmp.h>
 #include <stddef.h>
 
-#define BUCKET_POLY_LEN 128   // 多项式系数数量
-#define RESULT_POLY_LEN 255   // 结果多项式系数数量
-#define BUCKET_ROOTS    127   // 根数量
+#define BUCKET_POLY_LEN 512   // 多项式系数数量
+#define RESULT_POLY_LEN 1023   // 结果多项式系数数量
+#define BUCKET_ROOTS    511   // 根数量
 
 typedef struct {
     mpz_t roots[BUCKET_ROOTS];             // 127 个随机根

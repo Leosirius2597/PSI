@@ -10,6 +10,11 @@
 #include "crt_gmp.h"
 #include "modsystem.h"
 
+#ifndef MAX
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
+
+
 // =============================
 //   PSI 协议阶段模块
 // =============================
