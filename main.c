@@ -15,7 +15,7 @@ int main(){
     clock_t t_init_begin, t_init_end, t_outsrc_begin, t_outsrc_end, t_compute_begin, t_compute_end, t_check_begin, t_check_end;
 
     // 用户数量
-    int client_count = 3;
+    int client_count = 1;
 
     // 数据集大小
     int DATASET_NUM;
@@ -49,7 +49,7 @@ int main(){
         ModSystem mods;
 
         //初始化模数
-        modsystem_init_auto(&mods, 200, 123);
+        modsystem_init_auto(&mods, 40, 123);
 
         t_init_begin = clock();
         // 初始化客户端
