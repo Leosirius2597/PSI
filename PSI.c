@@ -3,8 +3,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 
+// 生成计时点
+
+clock_t  t_begin, t_end;
+
+// 示例 
+// t_begin = clock();
+// t_end = clock();
+// printf("单个用户初始化耗时：%.3f 秒\n", (double)(t_end - t_begin)/CLOCKS_PER_SEC);
 
 // ===========================
 // 阶段 1：AES 会话密钥同步
@@ -61,7 +70,7 @@ void psi_sync_all_clients(PSICloud *cloud, Client *clients[], size_t client_coun
 
     }
 
-    printf("[PSI] 阶段 1：AES 会话密钥同步完成。\n");
+    // printf("[PSI] 阶段 1：AES 会话密钥同步完成。\n");
 }
 
 
@@ -1489,6 +1498,9 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
         }
     
         // ---------- Step 5: 各方计算 PSI 结果 ----------
+        
+        // 设置计时点
+        t_begin = clock();
 
         // 多项式并行
         #pragma omp parallel for schedule(dynamic)
@@ -1509,9 +1521,15 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
             }
         }
 
+        t_end = clock();
+        printf("用户%d计算PSI耗时：%.3f 秒\n", t, (double)(t_end - t_begin)/CLOCKS_PER_SEC);
+
         // ---------- Step 5: 云端侧计算 PSI 结果（d,e 重新打乱后对齐） ----------
     
         // 云端在打乱顺序下计算结果
+
+        // 设置计时点
+        t_begin = clock();
 
         // 多项式并行
         #pragma omp parallel for schedule(dynamic)
@@ -1536,8 +1554,12 @@ void beaver_compute_multiplication(Client *clients[], int client_count, PSICloud
             mpz_set(res_cloud->tag, c1->tag); // tag 同步
 
 
-        }   
-        printf("[Beaver] 云平台 PSI 结果计算完成。\n");
+        }
+        
+        t_end = clock();
+        printf("PSI云平台计算用户%dPSI耗时：%.3f 秒\n", t, (double)(t_end - t_begin)/CLOCKS_PER_SEC);
+
+        printf("[Beaver] 云平台计算用户%d的 PSI 结果完成。\n", t);
         
         // 清理本用户的临时变量
         for (size_t i = 0; i < k; ++i) {

@@ -44,13 +44,14 @@ int main(){
         // 生成客户端数组
         Client **clients = malloc(sizeof(Client*) * client_count);
 
-        t_init_begin = clock();
+        
         // 生成模数
         ModSystem mods;
 
         //初始化模数
         modsystem_init_auto(&mods, 200, 123);
 
+        t_init_begin = clock();
         // 初始化客户端
         for (size_t i = 0; i < client_count; ++i) {
             clients[i] = malloc(sizeof(Client));
@@ -58,6 +59,9 @@ int main(){
             client_build_buckets(clients[i], mods.M);
             client_insert_dataset(clients[i], mods.M);
         }
+
+        t_init_end = clock();
+        printf("单个用户初始化耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC / client_count);
 
         // 初始化验证方
         verify_init(&verify, DATASET_NUM, DATA_BIT, BUCKET_NUM, 456);
@@ -70,8 +74,7 @@ int main(){
         // 初始化Beaver云平台
         beaver_cloud_init(&beaver_cloud, DATA_BIT, 123, BUCKET_NUM);
         
-        t_init_end = clock();
-        printf("初始化阶段耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC);
+        
 
         // 进行PSI
         // 第一步，PSI云平台将AES密钥发送给各方
@@ -95,7 +98,7 @@ int main(){
         beaver_compute_multiplication(clients, client_count, &psi_cloud, &verify, &mods);
 
         t_compute_end = clock();
-        printf("PSI计算阶段耗时：%.3f 秒\n", (double)(t_compute_end - t_compute_begin)/CLOCKS_PER_SEC);
+        printf("PSI计算阶段总耗时：%.3f 秒\n", (double)(t_compute_end - t_compute_begin)/CLOCKS_PER_SEC);
 
         // 第六步，验证方分发AES密钥给用户
         verify_distribute_aes_key(&verify, clients, client_count);
