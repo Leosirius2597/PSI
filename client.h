@@ -57,6 +57,9 @@ void client_insert_data(Client *cli, size_t bucket_idx, const mpz_t data, const 
 // 插入整个数据集到桶中
 void client_insert_dataset(Client *cli, const mpz_t M);
 
+// client生成自己的数据桶
+void client_generate_P_BUCKET(Client *cli);
+
 // 从指定桶删除一个数据（根）
 // bucket_idx : 桶编号
 // r_out      : 要删除的数据（GMP整数）

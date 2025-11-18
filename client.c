@@ -108,10 +108,6 @@ void client_build_buckets(Client *cli, const mpz_t M) {
     // 直接展开成多项式即可
     bucket_expand(&cli->H_P, M);
 
-    // 初始化元素数
-    for (size_t i = 0; i < cli->k; ++i)
-        cli->H_P.buckets[i].element_num = 0;
-
     printf("[Client] H_P 构建完成，共 %u 个桶。\n", cli->k);
 }
 
@@ -246,6 +242,46 @@ void client_generate_shuffle_table(Client *cli, unsigned long seed) {
 
     printf("[Client Init] 桶打乱表已生成（未实际打乱内存顺序）。\n");
 }
+
+
+// 生成数据桶
+void client_generate_P_BUCKET(Client *cli){
+
+    size_t total = (1UL << cli->n);
+    printf("[Client Insert] 开始将 %zu 个数据插入到 %u 个桶中...\n", total, cli->k);
+
+    mpz_t s_tagged;
+    mpz_init(s_tagged);
+    
+    // 初始化元素数
+    for (size_t i = 0; i < cli->k; ++i)
+        cli->H_P.buckets[i].element_num = 0;
+
+    for (size_t i = 0; i < total; ++i){
+
+        // 1️⃣ 计算哈希值并映射桶
+        uint64_t h = hash48_compute(cli->data[i]);
+        size_t bucket_idx = h % cli->k;
+
+        // 2️⃣ 附加哈希到数据
+        hash48_append(s_tagged, cli->data[i]);
+    
+        // 3️⃣ 插入数据
+        if (!cli || bucket_idx >= cli->k) {
+            fprintf(stderr, "[client_insert_data] 参数错误。\n");
+            return;
+        }
+
+        mpz_set(cli->H_P.buckets[bucket_idx].roots[cli->H_P.buckets[bucket_idx].element_num], s_tagged);
+        cli->H_P.buckets[bucket_idx].element_num += 1;
+
+    }
+
+    mpz_clear(s_tagged);
+    printf("[Client Insert] 全部数据插入完成。\n");
+}
+
+
 
 // 将数据从数据集中插入到桶中
 void client_insert_dataset(Client *cli, const mpz_t M) {

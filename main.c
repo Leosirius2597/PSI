@@ -51,17 +51,22 @@ int main(){
         //初始化模数
         modsystem_init_auto(&mods, 40, 123);
 
-        t_init_begin = clock();
+       
         // 初始化客户端
         for (size_t i = 0; i < client_count; ++i) {
             clients[i] = malloc(sizeof(Client));
             client_init(clients[i], DATASET_NUM, DATA_BIT, BUCKET_NUM, 123, i+1);
+            
+            t_init_begin = clock();
+            
+            client_generate_P_BUCKET(clients[i]);
+
+            t_init_end = clock();
+            printf("单个用户插入数据耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC / client_count);
             client_build_buckets(clients[i], mods.M);
-            client_insert_dataset(clients[i], mods.M);
         }
 
-        t_init_end = clock();
-        printf("单个用户初始化耗时：%.3f 秒\n", (double)(t_init_end - t_init_begin)/CLOCKS_PER_SEC / client_count);
+        
 
         // 初始化验证方
         verify_init(&verify, DATASET_NUM, DATA_BIT, BUCKET_NUM, 456);
